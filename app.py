@@ -8,43 +8,33 @@ import datetime
 import json
 # from cgi import escape
 
-CONNECTION_STRING = 'item.db'
+CONNECTION_STRING = 'asset-system.db'
 
-@route('/')
-def index():
-
+def executeSql(sql):
 	con = None
-
 	try:
 		con = sqlite3.connect(CONNECTION_STRING)
-		
 		con.row_factory = sqlite3.Row
-		
 		cur = con.cursor()
-		
-		cur.execute("CREATE TABLE IF NOT EXISTS Items(id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR NOT NULL, description VARCHAR NOT NULL);")
-	
-		cur.execute("SELECT * FROM Items")
+		cur.execute(sql)
+		con.commit(),
 
+	except sqlite3.Error, e:
+		print "Error %s:" % e.args[0]
+		sys.exit(1)
+	finally:
+		if con:
+			con.close()
+	
+def fetchAll(sql):
+	con = None
+	try:
+		con = sqlite3.connect(CONNECTION_STRING)
+		con.row_factory = sqlite3.Row
+		cur = con.cursor()
+		cur.execute(sql)
 		rows = list(cur.fetchall())
-
-		html = "<html><body>"
-		html += "<div> <a href='/new'>Novo</a> </div>"
-		html += "<table><tr><td>ID</td><td>Name</td><td>Description</td><td>Acao</td></tr>"
-
-		for row in rows:
-			html += """
-<tr>
-	<td>%s</td>
-	<td>%s</td>
-	<td>%s</td>
-	<td><a href='#' onclick=\"javascript:document.location='/update?ItemId=%s'\">atualizar</a></td>
-	<td><a href='#' onclick=\"javascript:document.location='/delete?ItemId=%s'\">excluir</a></td>
-</tr>""" % (row['id'], row['name'], row['description'], row['id'], row['id'])
-
-		html += "<table><body><html>"
-
-		return html
+		return rows,
 
 	except sqlite3.Error, e:
 		print "Error %s:" % e.args[0]
@@ -52,71 +42,15 @@ def index():
 	finally:
 		if con:
 			con.close()
-
-
-@route('/submit')
-def submit():
-
-	action = request.query.get('action')
-	print action
-	if action == 'Novo':
-		redirect('new')
-	elif action == 'Atualizar':
-		redirect('update?ItemId=%s' % request.query.get('ItemId'))
-	elif action == 'Excluir':
-		deleteItem(int(request.query.get('ItemId')))
-		redirect('/')
-
-@route('/new')
-def new():
-
-	html = """
-<html>
-	<body>
-		<form action='save'>
-			<div>
-				Name: <input type='text' name='name'><br>
-				Descricao: <input type='text' name='description'>
-			</div>
-			<div>
-				<input type='submit' value='Salvar'>
-			</div>
-		<form>
-	</body>
-</html>
-	"""
-	return html
-	
-
-@route('/update')
-def update():
+			
+def fetchOne(sql):
 	con = None
-
 	try:
 		con = sqlite3.connect(CONNECTION_STRING)
 		con.row_factory = sqlite3.Row
 		cur = con.cursor()
-		sqlCommand = "SELECT * FROM Items WHERE id=%s" % request.query.get('ItemId')
-		cur.execute(sqlCommand)
-		row = cur.fetchone()
-		html = """
-<html>
-	<body>
-		<form action='save'>
-			<div>
-				<input type='hidden' name='ItemId' value=%s>
-				Name: <input type='text' name='name' value='%s'><br>
-				Descricao: <input type='text' name='description' value='%s'>
-			</div>
-			<div>
-				<input type='submit' value='Salvar'>
-			</div>
-		<form>
-	</body>
-</html>
-		""" % (row['id'] or '', row['name'] or '', row['description'] or '')
-
-		return html
+		cur.execute(sql)
+		return cur.fetchone(),
 
 	except sqlite3.Error, e:
 		print "Error %s:" % e.args[0]
@@ -124,73 +58,61 @@ def update():
 	finally:
 		if con:
 			con.close()
+			
+#Criando tabelas no banco
+ddl = open('ddl.sql', 'r')
+for line in ddl:
+	executeSql(line),
 
-@route('/save')
-def save():
-	ItemId = request.query.get('ItemId')
-	name = request.query.get('name')
-	description = request.query.get('description')
-
-	if ItemId:
-		saveItem({'name': name, 'description': description}, id=int(ItemId))
-	else:
-		saveItem({'name': name, 'description': description})
-
-	redirect('/')
-
-@route('/delete')
-def delete():
-	ItemId = request.query.get('ItemId')
+@route('/app/home')
+def home():
+	return template('home')
 	
-	deleteItem(ItemId)
+@route('/app/user/new')
+def newUser():
+	return template('new-user')
 
-	redirect('/')
+@route('/app/user/new/save')
+def saveNewUser():
+	nome = request.query.get('nome')
+	telefone = request.query.get('telefone')
+	senha = request.query.get('senha')
+	role = request.query.get('role')
+	
+	sql = "INSERT INTO USUARIO(NOME, TELEFONE, SENHA, ROLE) VALUES('%s','%s','%s','%s')" % (nome, telefone, senha, role)
+	
+	executeSql(sql)
+	redirect('/app/user')
 
+@route('/app/user')
+def listUsers():
+	rows = fetchAll('SELECT * FROM USUARIO')
+	return template('user-list',usuarios = rows[0])
+	
+@route('/app/user/update')
+def updateUser():
+	sql = "SELECT * FROM USUARIO WHERE ID = %s" % request.query.get('id')
+	usuario = fetchOne(sql)
+	return template('update-user', usuario = usuario[0])
+	
+@route('/app/user/update/save')
+def saveUpdatedUser():
+	nome = request.query.get('nome')
+	telefone = request.query.get('telefone')
+	senha = request.query.get('senha')
+	role = request.query.get('role')
+	id = request.query.get('id')
+	
+	sql = "UPDATE USUARIO SET NOME = '%s', TELEFONE = '%s', SENHA = '%s', ROLE = '%s' WHERE ID = %s" % (nome, telefone, senha, role, id)
+	
+	executeSql(sql)
+	redirect('/app/user')
 
-
-def saveItem(data, id=None):
-	con = None
-	try:
-		con = sqlite3.connect(CONNECTION_STRING)
-		cur = con.cursor()
-		if id:
-			# UPDATE
-			# data['alteredIn'] = datetime.datetime.now()
-			data['id'] = id
-			sqlCommand = "UPDATE Items SET name='%s', description='%s' WHERE id=%s" % (data['name'], data['description'], data['id']) 
-			cur.execute(sqlCommand)
-		else:
-			# INSERT
-			# data['alteredIn'] = datetime.datetime.now()
-			# data['createdIn'] = datetime.datetime.now()
-			sqlCommand = "INSERT INTO Items (name, description) VALUES ('%s', '%s')" % (data['name'], data['description'])
-			cur.execute(sqlCommand)
-		con.commit()
-
-	except sqlite3.Error, e:
-		print "Error %s:" % e.args[0]
-		sys.exit(1)
-	finally:
-		if con:
-			con.close()
-
-
-def deleteItem(id):
-
-	con = None
-
-	try:
-		con = sqlite3.connect(CONNECTION_STRING)
-		cur = con.cursor()
-		sqlCommand = "DELETE FROM Items WHERE id=%s" % id
-		cur.execute(sqlCommand)
-		con.commit()
-	except sqlite3.Error, e:
-		print "Error %s:" % e.args[0]
-		sys.exit(1)
-	finally:
-		if con:
-			con.close()
+@route('/app/user/delete')
+def delete():
+	sql = "DELETE FROM USUARIO WHERE ID = %s" % request.query.get('id')
+	executeSql(sql)
+	redirect('/app/user')
 
 run(host='localhost', port=8080)
 
