@@ -1,0 +1,65 @@
+h1 {
+	padding: 10px;
+	padding-bottom: 3px;
+}
+
+ul.menu {
+    list-style-type: none;    
+    padding: 0;
+    background-color: #f1f1f1;
+	overflow: hidden;
+	border-radius: 5px;
+}
+
+ul.menu li {
+    float: left;
+}
+
+ul.menu li a {
+    display: block;
+    color: #000;
+    text-align: center;
+    padding: 14px 16px;
+    text-decoration: none;
+}
+
+/* Change the link color on hover */
+ul.menu li a:hover {
+    background-color: #555;
+    color: white;
+	text-decoration: none;
+}
+
+ul.menu li a:focus{ 
+	text-decoration: none;	
+}
+
+ul.menu li a.active {
+    background-color: #337ab7; /* #4CAF50; */
+    color: white;
+	text-decoration: none;
+}
+
+ul.menu li.logout {
+	float: right;
+}
+
+ul.menu li.logout a:hover{
+	background-color: #d00000;
+    color: white;
+	text-decoration: none;
+}
+
+ul.menu li.logout a.active{
+	background-color: #d00000;
+    color: white;
+	text-decoration: none;
+}
+
+div.conteudo {
+	overflow: auto;	
+}
+
+div.message {
+	text-align: center;
+}
